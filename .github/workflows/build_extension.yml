@@ -1,0 +1,53 @@
+name: Build Any Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      extension_path:
+        description: 'Nhập đường dẫn module hoặc tên extension cần build'
+        required: true
+        default: 'vi:teamlanhlung'
+        type: string
+
+jobs:
+  build:
+    name: Build Selected Extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Parse Extension Input & Build
+        run: |
+          INPUT="${{ github.event.inputs.extension_path }}"
+          
+          # Chuẩn hóa đầu vào thành định dạng Gradle module chuẩn (ví dụ: :src:vi:teamlanhlung)
+          if [[ $INPUT == :* ]]; then
+            GRADLE_MODULE="$INPUT"
+          elif [[ $INPUT == src:* ]]; then
+            GRADLE_MODULE=":$INPUT"
+          else
+            # Nếu user chỉ nhập dạng "vi:teamlanhlung", tự động thêm ":src:" vào trước
+            GRADLE_MODULE=":src:$INPUT"
+          fi
+          
+          echo "Đang tiến hành build cho module: $GRADLE_MODULE"
+          ./gradlew ${GRADLE_MODULE}:assembleRelease
+
+      - name: Locate and Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: converted-extension-apk
+          # Tìm kiếm tất cả các file apk release nằm trong các thư mục build
+          path: src/**/build/outputs/apk/release/*.apk
